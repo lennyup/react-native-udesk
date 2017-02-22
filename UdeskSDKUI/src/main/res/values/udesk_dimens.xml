@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- 整体界面中，顶部Title条的高度 -->
+    <dimen name="udesk_titlebar_height">48dp</dimen>
+
+    <!-- 整体界面中，TitleBar两侧的内边距 -->
+    <dimen name="udesk_titlebar_right_margin">10dp</dimen> 
+    <dimen name="udesk_titlebar_left_margin">10dp</dimen> 
+
+   
+    
+    
+    
+    <dimen name="udesk_chat_head_margin_left_or_right">8dip</dimen>
+    <dimen name="udesk_1">1dip</dimen>
+    <dimen name="udesk_2">2dip</dimen>
+    <dimen name="udesk_3">3dip</dimen>
+    <dimen name="udesk_4">4dip</dimen>
+    <dimen name="udesk_5">5dip</dimen>
+    <dimen name="udesk_8">8dip</dimen>
+    <dimen name="udesk_10">10dip</dimen>
+    <dimen name="udesk_13">13dip</dimen>
+    <dimen name="udesk_15">15dip</dimen>
+    <dimen name="udesk_20">20dip</dimen>
+    <dimen name="udesk_22">22dip</dimen>
+    <dimen name="udesk_25">25dip</dimen>
+    <dimen name="udesk_30">30dip</dimen>
+    <dimen name="udesk_35">35dip</dimen>
+    <dimen name="udesk_40">40dip</dimen>
+    <dimen name="udesk_45">45dip</dimen>
+    <dimen name="udesk_50">50dip</dimen>
+    <dimen name="udesk_55">55dip</dimen>
+    <dimen name="udesk_60">60dip</dimen>
+    <dimen name="udesk_70">70dip</dimen>
+    <dimen name="udesk_80">80dip</dimen>
+    <dimen name="udesk_160">160dip</dimen>
+    <dimen name="udesk_300">300dip</dimen>
+
+    <dimen name="udesk_sp12">12sp</dimen>
+    <dimen name="udesk_sp14">14sp</dimen>
+    <dimen name="udesk_sp15">15sp</dimen>
+    <dimen name="udesk_sp16">16sp</dimen>
+    <dimen name="udesk_sp18">18sp</dimen>
+    <dimen name="udesk_sp20">20sp</dimen>
+    <dimen name="udesk_chat_head">45dip</dimen>
+    <dimen name="udesk_chat_head_margin">3dip</dimen>
+    <dimen name="udesk_chat_msg_send_fail_pic">22dip</dimen>
+    <dimen name="udesk_chat_context_margin_other_derction">62dip</dimen>
+
+
+    <!-- 整体界面中，TitleBar中文字的大小 -->
+    <dimen name="udesk_navi_text_size">18sp</dimen>
+
+   
+
+
+
+
+
+
+
+
+
+
+
+    <!-- IM界面，商品咨询中 缩略图的宽度和高度 -->
+    <dimen name="udesk_im_commondity_width_height">65dp</dimen>
+
+
+
+</resources>
