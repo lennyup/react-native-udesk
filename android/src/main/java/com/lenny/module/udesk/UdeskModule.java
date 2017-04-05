@@ -56,31 +56,31 @@ class UdeskModule extends ReactContextBaseJavaModule {
         UdeskSDKManager.getInstance().initApiKey(mReactContext.getApplicationContext(), this.appDomain, this.appKey, this.appId);
     }
 
-    @ReactMethod
-    public void setUserInfo(String token, String name, String email, String phone, String description) {
-//        initSDK();
-
-        Map<String, String> info = new HashMap<>();
-        if (token == null) {
-            token = UUID.randomUUID().toString();
-        }
-        //token 必填
-        info.put(UdeskConst.UdeskUserInfo.USER_SDK_TOKEN, token);
-        //以下信息是可选
-        if (name != null) {
-            info.put(UdeskConst.UdeskUserInfo.NICK_NAME, name);
-        }
-        if (email != null) {
-            info.put(UdeskConst.UdeskUserInfo.EMAIL, email);
-        }
-        if (phone != null) {
-            info.put(UdeskConst.UdeskUserInfo.CELLPHONE, phone);
-        }
-        if (description != null) {
-            info.put(UdeskConst.UdeskUserInfo.DESCRIPTION, description);
-        }
-        UdeskSDKManager.getInstance().setUserInfo(mReactContext.getApplicationContext(), token, info);
-    }
+//     @ReactMethod
+//     public void setUserInfo(String token, String name, String email, String phone, String description) {
+// //        initSDK();
+//
+//         Map<String, String> info = new HashMap<>();
+//         if (token == null) {
+//             token = UUID.randomUUID().toString();
+//         }
+//         //token 必填
+//         info.put(UdeskConst.UdeskUserInfo.USER_SDK_TOKEN, token);
+//         //以下信息是可选
+//         if (name != null) {
+//             info.put(UdeskConst.UdeskUserInfo.NICK_NAME, name);
+//         }
+//         if (email != null) {
+//             info.put(UdeskConst.UdeskUserInfo.EMAIL, email);
+//         }
+//         if (phone != null) {
+//             info.put(UdeskConst.UdeskUserInfo.CELLPHONE, phone);
+//         }
+//         if (description != null) {
+//             info.put(UdeskConst.UdeskUserInfo.DESCRIPTION, description);
+//         }
+//         UdeskSDKManager.getInstance().setUserInfo(mReactContext.getApplicationContext(), token, info);
+//     }
 
     @ReactMethod
     public void setUserInfo(final ReadableMap options, final Callback callback) {
@@ -104,9 +104,11 @@ class UdeskModule extends ReactContextBaseJavaModule {
         if (hasAndNotEmpty(options, "description")) {
             info.put(UdeskConst.UdeskUserInfo.EMAIL, options.getString("description"));
         }
-        Map field = (Map) options.getMap("custom_field");
-        if (field!= null) {
-            UdeskSDKManager.getInstance().setUserInfo(mReactContext.getApplicationContext(), token, info, field);
+        ReadableMap field = options.getMap("custom_field");
+        if (field!= null && field.hasKey("TextField_10075")) {
+            Map<String, String> fields = new HashMap<>();
+            fields.put("TextField_10075", field.getString("TextField_10075"));
+            UdeskSDKManager.getInstance().setUserInfo(mReactContext.getApplicationContext(), token, info, fields);
         } else {
             UdeskSDKManager.getInstance().setUserInfo(mReactContext.getApplicationContext(), token, info);
         }
@@ -135,16 +137,16 @@ class UdeskModule extends ReactContextBaseJavaModule {
         UdeskSDKManager.getInstance().entryChat(mReactContext.getApplicationContext());
     }
 
-    @ReactMethod
-    public void createCommodity (String title, String description, String imageUrl, String productUrl) { // 都是必传的
-        UdeskCommodityItem item = new UdeskCommodityItem();
-        item.setTitle(title);// 商品主标题
-        item.setSubTitle(description);//商品副标题
-        item.setThumbHttpUrl(imageUrl);// 左侧图片
-        item.setCommodityUrl(productUrl);// 商品网络链接
-        UdeskSDKManager.getInstance().setCommodity(item);
-        UdeskSDKManager.getInstance().toLanuchChatAcitvity(mReactContext.getApplicationContext());
-    }
+    // @ReactMethod
+    // public void createCommodity (String title, String description, String imageUrl, String productUrl) { // 都是必传的
+    //     UdeskCommodityItem item = new UdeskCommodityItem();
+    //     item.setTitle(title);// 商品主标题
+    //     item.setSubTitle(description);//商品副标题
+    //     item.setThumbHttpUrl(imageUrl);// 左侧图片
+    //     item.setCommodityUrl(productUrl);// 商品网络链接
+    //     UdeskSDKManager.getInstance().setCommodity(item);
+    //     UdeskSDKManager.getInstance().toLanuchChatAcitvity(mReactContext.getApplicationContext());
+    // }
 
     @ReactMethod
     public void createCommodity (final ReadableMap options, final Callback callback) { // 都是必传的
