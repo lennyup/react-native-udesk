@@ -95,10 +95,10 @@ class UdeskModule extends ReactContextBaseJavaModule {
             info.put(UdeskConst.UdeskUserInfo.EMAIL, options.getString("email"));
         }
         if (hasAndNotEmpty(options, "cellphone")) {
-            info.put(UdeskConst.UdeskUserInfo.EMAIL, options.getString("cellphone"));
+            info.put(UdeskConst.UdeskUserInfo.CELLPHONE, options.getString("cellphone"));
         }
         if (hasAndNotEmpty(options, "description")) {
-            info.put(UdeskConst.UdeskUserInfo.EMAIL, options.getString("description"));
+            info.put(UdeskConst.UdeskUserInfo.DESCRIPTION, options.getString("description"));
         }
         ReadableMap field = options.getMap("customer_field");
         if (field!= null && field.hasKey("TextField_10075")) {
