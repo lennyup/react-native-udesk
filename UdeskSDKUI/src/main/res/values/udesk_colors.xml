@@ -5,6 +5,7 @@
 
 
     <!-- 顶部TitleBar的背景色 -->
+    <color name="udesk_titlebar_bg">#F23530</color>
     <color name="udesk_titlebar_bg1">#0093FF</color>
     <color name="udesk_titlebar_bg2">#00BAD4</color>
 
@@ -71,7 +72,7 @@
     <color name="udesk_edit_input_msg_cololr2">#333333</color>
 
     <color name="udesk_edit_input_hint_msg_cololr1">#C3CDD4</color>
-    <color name="udesk_bottom_send1">#0093FF</color>
+    <color name="udesk_bottom_send1">#f23530</color>
     <color name="udesk_bottom_send2">#0093FF</color>
 
     <color name="udesk_bottom_send_textcolor1">#FFFFFFFF</color>

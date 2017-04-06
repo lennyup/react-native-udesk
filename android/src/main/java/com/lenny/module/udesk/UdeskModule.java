@@ -19,6 +19,7 @@ import java.util.UUID;
 
 import cn.udesk.UdeskConst;
 import cn.udesk.UdeskSDKManager;
+import cn.udesk.config.UdeskConfig;
 import cn.udesk.model.UdeskCommodityItem;
 
 /**
@@ -32,18 +33,6 @@ class UdeskModule extends ReactContextBaseJavaModule {
     public UdeskModule(ReactApplicationContext reactContext) {
         super(reactContext);
         mReactContext = reactContext;
-        ApplicationInfo info = null;
-        try {
-            info = reactContext.getPackageManager().getApplicationInfo(reactContext.getPackageName(), PackageManager.GET_META_DATA);
-        } catch (PackageManager.NameNotFoundException e) {
-            e.printStackTrace();
-        }
-        if (!info.metaData.containsKey("UDESK_DOMAIN") || !info.metaData.containsKey("UDESK_APPKEY") || !info.metaData.containsKey("UDESK_APPID")) {
-            throw new Error("meta-data not found in AndroidManifest.xml");
-        }
-        this.appId = info.metaData.getString("UDESK_APPID");
-        this.appKey = info.metaData.getString("UDESK_APPKEY");
-        this.appDomain = info.metaData.getString("UDESK_DOMAIN");
     }
 
     @Override
@@ -52,8 +41,12 @@ class UdeskModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void initSDK() {
+    public void initSDK(String appDomain, String appKey, String appId) {
+        this.appDomain = appDomain;
+        this.appKey = appKey;
+        this.appId = appId;
         UdeskSDKManager.getInstance().initApiKey(mReactContext.getApplicationContext(), this.appDomain, this.appKey, this.appId);
+        UdeskConfig.udeskTitlebarBgResId = cn.udesk.R.color.udesk_titlebar_bg;
     }
 
 //     @ReactMethod
@@ -85,26 +78,29 @@ class UdeskModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void setUserInfo(final ReadableMap options, final Callback callback) {
         Map<String, String> info = new HashMap<>();
-        String token = options.getString("token");
+        if (!hasAndNotEmpty(options, "sdk_token")) {
+            return;
+        }
+        String token = options.getString("sdk_token");
         if (token == null) {
             token = UUID.randomUUID().toString();
         }
         //token 必填
         info.put(UdeskConst.UdeskUserInfo.USER_SDK_TOKEN, token);
         //以下信息是可选
-        if (hasAndNotEmpty(options, "name")) {
-            info.put(UdeskConst.UdeskUserInfo.NICK_NAME, options.getString("name"));
+        if (hasAndNotEmpty(options, "nick_name")) {
+            info.put(UdeskConst.UdeskUserInfo.NICK_NAME, options.getString("nick_name"));
         }
         if (hasAndNotEmpty(options, "email")) {
             info.put(UdeskConst.UdeskUserInfo.EMAIL, options.getString("email"));
         }
-        if (hasAndNotEmpty(options, "phone")) {
-            info.put(UdeskConst.UdeskUserInfo.EMAIL, options.getString("phone"));
+        if (hasAndNotEmpty(options, "cellphone")) {
+            info.put(UdeskConst.UdeskUserInfo.EMAIL, options.getString("cellphone"));
         }
         if (hasAndNotEmpty(options, "description")) {
             info.put(UdeskConst.UdeskUserInfo.EMAIL, options.getString("description"));
         }
-        ReadableMap field = options.getMap("custom_field");
+        ReadableMap field = options.getMap("customer_field");
         if (field!= null && field.hasKey("TextField_10075")) {
             Map<String, String> fields = new HashMap<>();
             fields.put("TextField_10075", field.getString("TextField_10075"));
@@ -151,27 +147,27 @@ class UdeskModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void createCommodity (final ReadableMap options, final Callback callback) { // 都是必传的
         cleanResponse();
-        if (!hasAndNotEmpty(options, "title")) {
+        if (!hasAndNotEmpty(options, "productTitle")) {
             invokeError(callback, "title is empty");
             return;
         }
-        if (!hasAndNotEmpty(options, "description")) {
+        if (!hasAndNotEmpty(options, "productDetail")) {
             invokeError(callback, "description is empty");
             return;
         }
-        if (!hasAndNotEmpty(options, "imageUrl")) {
+        if (!hasAndNotEmpty(options, "productImageUrl")) {
             invokeError(callback, "imageUrl is empty");
             return;
         }
-        if (!hasAndNotEmpty(options, "productUrl")) {
+        if (!hasAndNotEmpty(options, "productURL")) {
             invokeError(callback, "productUrl is empty");
             return;
         }
         UdeskCommodityItem item = new UdeskCommodityItem();
-        item.setTitle(options.getString("title"));// 商品主标题
-        item.setSubTitle(options.getString("description"));//商品副标题
-        item.setThumbHttpUrl(options.getString("imageUrl"));// 左侧图片
-        item.setCommodityUrl(options.getString("productUrl"));// 商品网络链接
+        item.setTitle(options.getString("productTitle"));// 商品主标题
+        item.setSubTitle(options.getString("productDetail"));//商品副标题
+        item.setThumbHttpUrl(options.getString("productImageUrl"));// 左侧图片
+        item.setCommodityUrl(options.getString("productURL"));// 商品网络链接
         UdeskSDKManager.getInstance().setCommodity(item);
         UdeskSDKManager.getInstance().toLanuchChatAcitvity(mReactContext.getApplicationContext());
     }
@@ -207,6 +203,9 @@ class UdeskModule extends ReactContextBaseJavaModule {
     }
 
     public void invokeResponse(@NonNull final Callback callback) {
+        if (callback == null) {
+            return;
+        }
         callback.invoke(response);
     }
 
