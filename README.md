@@ -18,14 +18,6 @@ project(':UdeskSDKUI').projectDir = new File(rootProject.projectDir, '../node_mo
 ```
 compile project(':react-native-udesk')
 ```
-在`android/app/build.gradle`里，defaultConfig栏目下添加如下代码：
-```
-        manifestPlaceholders = [
-                UDESK_DOMAIN: "xxx",
-                UDESK_APPKEY: "xxx",
-                UDESK_APPID: "xxx"
-        ]
-```
 在 application里添加如下代码：
  ```
  new UdeskPackage()
@@ -35,4 +27,44 @@ compile project(':react-native-udesk')
 
 ```
 import com.lenny.module.udesk.UdeskPackage;
+```
+## 使用
+### 初始化
+```
+...
+import UdeskAPI from 'react-native-udesk';
+...
+UdeskAPI.initSDK(UDESK_DOMAIN, UDESK_APPKEY, UDESK_APPID);
+```
+### 设置用户信息
+```
+const user = {
+        nick_name: ***,
+        cellphone: ***,
+        // email: ***,
+        sdk_token: ***,
+        customer_field: { // 自定义的字段
+          TextField_10075: ***,
+        },
+        // description: ***,
+      }；
+      UdeskAPI.setUserInfo(user, (response) => {
+
+        });
+```
+### 普通的在线客服
+```
+UdeskAPI.entryChat();
+```
+### 带商品信息的 客服聊天界面
+```
+ const params = {
+   productImageUrl: 'https://qn-im.udesk.cn/570D6DB3-113D-4310-921A-F5E66D158CC2-2017-04-05-03-42-33.jpg',
+   productTitle: '测试测试测试测你测试测试测你测试测试测你测试测试测你测试测试测你测试测试测你！',
+   productDetail: '¥9988888.088888.088888.0',
+   productURL: 'http://www.xebest.com',
+ };
+UdeskAPI.createCommodity(params, (response) => {
+
+  });
 ```
