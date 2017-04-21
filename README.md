@@ -1,4 +1,6 @@
-# react-native-udesk
+# react-native-udesk [![npm version](https://badge.fury.io/js/react-native-udesk.svg)](https://badge.fury.io/js/react-native-image-picker)
+![MIT](https://img.shields.io/dub/l/vibe-d.svg) ![Platform - Android](https://img.shields.io/badge/platform-Android-yellow.svg)
+
 React Native 的udesk插件, 目前只支持android
 ## 如何安装
 ### 安装包
