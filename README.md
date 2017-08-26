@@ -72,7 +72,8 @@ UdeskAPI.createCommodity(params, (response) => {
   });
 ```
 
-### 代码混淆
+### android 代码混淆
+如果需要混淆，请加上以下规则
 ```
 //udesk
 -keep class udesk.** {*;}
@@ -104,5 +105,5 @@ UdeskAPI.createCommodity(params, (response) => {
 
 
  //其它
--keep class com.tencent.bugly.** {*; } 
+-keep class com.tencent.bugly.** {*; }
 ```
