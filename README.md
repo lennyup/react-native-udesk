@@ -71,3 +71,38 @@ UdeskAPI.createCommodity(params, (response) => {
 
   });
 ```
+
+### 代码混淆
+```
+//udesk
+-keep class udesk.** {*;}
+-keep class cn.udesk.**{*; }
+//七牛
+-keep class okhttp3.** {*;}
+-keep class okio.** {*;}
+-keep class com.qiniu.**{*;}
+-keep class com.qiniu.**{public <init>();}
+-ignorewarnings
+//smack
+-keep class org.jxmpp.** {*;}
+-keep class de.measite.** {*;}
+-keep class org.jivesoftware.** {*;}
+-keep class org.xmlpull.** {*;}
+-dontwarn org.xbill.**
+-keep class org.xbill.** {*;}
+
+//freso
+-keep class com.facebook.** {*; }  
+-keep class com.facebook.imagepipeline.** {*; }
+-keep class com.facebook.animated.gif.** {*; }  
+-keep class com.facebook.drawee.** {*; }  
+-keep class com.facebook.drawee.backends.pipeline.** {*; }  
+-keep class com.facebook.imagepipeline.** {*; }  
+-keep class bolts.** {*; }  
+-keep class me.relex.photodraweeview.** {*; }  
+
+
+
+ //其它
+-keep class com.tencent.bugly.** {*; } 
+```
