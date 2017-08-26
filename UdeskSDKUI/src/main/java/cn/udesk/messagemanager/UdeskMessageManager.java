@@ -1,17 +1,16 @@
 package cn.udesk.messagemanager;
 
 import android.text.TextUtils;
+import android.util.Log;
 
 import java.util.concurrent.ExecutorService;
 
 import cn.udesk.UdeskConst;
 import cn.udesk.UdeskSDKManager;
 import cn.udesk.config.UdeskBaseInfo;
+import cn.udesk.config.UdeskConfig;
 import cn.udesk.db.UdeskDBManager;
 import cn.udesk.model.MsgNotice;
-import rx.Observable;
-import rx.Subscriber;
-import rx.schedulers.Schedulers;
 import udesk.core.event.InvokeEventContainer;
 import udesk.core.event.ReflectInvokeMethod;
 import udesk.core.model.MessageInfo;
@@ -22,14 +21,15 @@ public class UdeskMessageManager {
 
     private UdeskXmppManager mUdeskXmppManager;
     private ExecutorService messageExecutor;
-    public ReflectInvokeMethod event_OnNewMessage = new ReflectInvokeMethod(new Class<?>[]{Message.class, String.class, String.class, String.class, String.class, Long.class});
+    public ReflectInvokeMethod event_OnNewMessage = new ReflectInvokeMethod(new Class<?>[]{Message.class, String.class,
+            String.class, String.class, String.class, Long.class, String.class});
     public ReflectInvokeMethod eventui_OnMessageReceived = new ReflectInvokeMethod(new Class<?>[]{String.class});
     public ReflectInvokeMethod eventui_OnNewMessage = new ReflectInvokeMethod(new Class<?>[]{MessageInfo.class});
     public ReflectInvokeMethod eventui_OnNewPresence = new ReflectInvokeMethod(new Class<?>[]{String.class, Integer.class});
     public ReflectInvokeMethod eventui_OnReqsurveyMsg = new ReflectInvokeMethod(new Class<?>[]{Boolean.class});
     public ReflectInvokeMethod event_OnNewMsgNotice = new ReflectInvokeMethod(new Class<?>[]{MsgNotice.class});
+    public ReflectInvokeMethod event_OnTicketReplayNotice = new ReflectInvokeMethod(new Class<?>[]{Boolean.class});
 
-    private Boolean isOverConversation = false;
 
     private static UdeskMessageManager instance = new UdeskMessageManager();
 
@@ -50,30 +50,24 @@ public class UdeskMessageManager {
         }
     }
 
-    public Observable<Boolean> loginXmppService() {
-
-        return Observable.create(new Observable.OnSubscribe<Boolean>() {
-            @Override
-            public void call(Subscriber<? super Boolean> subscriber) {
-                Boolean isConetted = mUdeskXmppManager.startLoginXmpp();
-                subscriber.onNext(isConetted);
-                subscriber.onCompleted();
-            }
-        }).subscribeOn(Schedulers.io());
-
-
+    public void connection() {
+        try {
+            Log.i("xxx","connection cancleXmpp");
+            ensureMessageExecutor();
+            messageExecutor.submit(new Runnable() {
+                @Override
+                public void run() {
+                    if (mUdeskXmppManager != null) {
+                        mUdeskXmppManager.cancel();
+                        mUdeskXmppManager.startLoginXmpp();
+                    }
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
-    public Observable<Boolean> cancelXmppConnect() {
-        return Observable.create(new Observable.OnSubscribe<Boolean>() {
-            @Override
-            public void call(Subscriber<? super Boolean> subscriber) {
-                boolean isCancel = mUdeskXmppManager.cancel();
-                subscriber.onNext(isCancel);
-                subscriber.onCompleted();
-            }
-        }).subscribeOn(Schedulers.io());
-    }
 
     public void sendMessage(String type, String text, String msgId, String to, long duration, String subsessionId) {
         mUdeskXmppManager.sendMessage(type, text, msgId, to, duration, subsessionId);
@@ -97,63 +91,76 @@ public class UdeskMessageManager {
 
     public void onMessageReceived(final String msgId) {
 
-        ensureMessageExecutor();
-        messageExecutor.submit(new Runnable() {
-            @Override
-            public void run() {
-                UdeskDBManager.getInstance().updateMsgSendFlag(msgId, UdeskConst.SendFlag.RESULT_SUCCESS);
-                UdeskDBManager.getInstance().deleteSendingMsg(msgId);
-                eventui_OnMessageReceived.invoke(msgId);
-            }
-        });
+        try {
+            ensureMessageExecutor();
+            messageExecutor.submit(new Runnable() {
+                @Override
+                public void run() {
+                    UdeskDBManager.getInstance().updateMsgSendFlag(msgId, UdeskConst.SendFlag.RESULT_SUCCESS);
+                    UdeskDBManager.getInstance().deleteSendingMsg(msgId);
+                    eventui_OnMessageReceived.invoke(msgId);
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
 
     public void onNewMessage(final Message message, String agentJid, final String type, final String msgId, final String content,
-                             final Long duration) {
-        String jid[] = agentJid.split("/");
-        final MessageInfo msginfo = buildReceiveMessage(jid[0], type, msgId, content, duration);
-        if (UdeskDBManager.getInstance().hasReceviedMsg(msgId)) {
-            if (mUdeskXmppManager != null) {
-                mUdeskXmppManager.sendReceivedMsg(message);
+                             final Long duration, final String send_status) {
+        try {
+            String jid[] = agentJid.split("/");
+            MessageInfo msginfo = null;
+            //判断是否是撤回消息
+            if (send_status.equals("rollback")) {
+                if (UdeskDBManager.getInstance().deleteMsgById(msgId)) {
+                    String[] urlAndNick = UdeskDBManager.getInstance().getAgentUrlAndNick(jid[0]);
+                    String agentName = "";
+                    if (urlAndNick != null) {
+                        agentName = urlAndNick[1];
+                    }
+                    String buildrollBackMsg = "客服" + agentName + "撤回一条消息";
+                    msginfo = buildReceiveMessage(jid[0], UdeskConst.ChatMsgTypeString.TYPE_EVENT, msgId, buildrollBackMsg, duration, send_status);
+                }
+            } else {
+                msginfo = buildReceiveMessage(jid[0], type, msgId, content, duration, send_status);  //消息在本地数据库存在，则结束后续流程
+                if (UdeskDBManager.getInstance().hasReceviedMsg(msgId)) {
+                    return;
+                }
+
             }
-            return;
-        }
-        ensureMessageExecutor();
-        if (!type.equals(UdeskConst.ChatMsgTypeString.TYPE_REDIRECT)) {
-            messageExecutor.submit(new Runnable() {
-
-                @Override
-                public void run() {
-
-                    boolean isSaveSuccess = UdeskDBManager.getInstance().addMessageInfo(msginfo);
-                    if (isSaveSuccess) {
-                        if (mUdeskXmppManager != null) {
-                            mUdeskXmppManager.sendReceivedMsg(message);
-                        }
+            if (!type.equals(UdeskConst.ChatMsgTypeString.TYPE_REDIRECT)) {
+                boolean isSaveSuccess = UdeskDBManager.getInstance().addMessageInfo(msginfo);
+                if (isSaveSuccess) {
+                    if (mUdeskXmppManager != null) {
+                        mUdeskXmppManager.sendReceivedMsg(message);
                     }
                 }
-            });
-        } else {
-            if (mUdeskXmppManager != null) {
-                mUdeskXmppManager.sendReceivedMsg(message);
+            } else {
+                if (mUdeskXmppManager != null) {
+                    mUdeskXmppManager.sendReceivedMsg(message);
+                }
             }
-        }
-        eventui_OnNewMessage.invoke(msginfo);
-
-        if (type.equals(UdeskConst.ChatMsgTypeString.TYPE_REDIRECT)) {
-            return;
-        }
-        if (UdeskBaseInfo.isNeedMsgNotice) {
-            MsgNotice msgNotice = new MsgNotice(msgId, type, content);
-            event_OnNewMsgNotice.invoke(msgNotice);
+            eventui_OnNewMessage.invoke(msginfo);
+            if (type.equals(UdeskConst.ChatMsgTypeString.TYPE_REDIRECT)) {
+                return;
+            }
+            if (UdeskBaseInfo.isNeedMsgNotice) {
+                MsgNotice msgNotice = new MsgNotice(msgId, type, content);
+                event_OnNewMsgNotice.invoke(msgNotice);
+                if (msgNotice != null && UdeskSDKManager.getInstance().getOnlineMessage() != null && !UdeskConfig.isUserSDkPush) {
+                    UdeskSDKManager.getInstance().getOnlineMessage().onlineMessageReceive(msgNotice);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
     }
 
-
     public MessageInfo buildReceiveMessage(String agentJid, String msgType, String msgId,
-                                           String content, long duration) {
+                                           String content, long duration, String send_status) {
         MessageInfo msg = new MessageInfo();
         msg.setMsgtype(msgType);
         msg.setTime(System.currentTimeMillis());
@@ -166,60 +173,71 @@ public class UdeskMessageManager {
         msg.setLocalPath("");
         msg.setDuration(duration);
         msg.setmAgentJid(agentJid);
+        msg.setSend_status(send_status);
         return msg;
     }
 
     public void onNewPresence(String jid, Integer onlineflag) {
-        eventui_OnNewPresence.invoke(jid, onlineflag);
+        try {
+            eventui_OnNewPresence.invoke(jid, onlineflag);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
     }
 
     public void onReqsurveyMsg(Boolean isSurvey) {
-        eventui_OnReqsurveyMsg.invoke(isSurvey);
-
-    }
-
-    public void onActionMsg(String actionText, String agentJId) {
-        if (TextUtils.isEmpty(actionText)) {
-            return;
-        }
-        if (actionText.equals("overtest")) {
-            mUdeskXmppManager.sendActionMessage(agentJId);
-        } else if (actionText.equals("over")) {
-            this.isOverConversation = true;
-            wrapCancelXmppConnect();
+        try {
+            eventui_OnReqsurveyMsg.invoke(isSurvey);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
     }
 
-    public boolean isConnected() {
-        return mUdeskXmppManager.isConnect();
-    }
-
-    private void wrapCancelXmppConnect() {
-        UdeskMessageManager.getInstance().cancelXmppConnect().subscribe(new Subscriber<Boolean>() {
-            @Override
-            public void onCompleted() {
+    public void onActionMsg(String type, String actionText, String agentJId) {
+        try {
+            if (TextUtils.isEmpty(actionText)) {
+                return;
+            }
+            if (type.equals("ticket_reply")) {
+                //调用获取工单离线消息
+                event_OnTicketReplayNotice.invoke(true);
+                return;
+            }
+            if (actionText.equals("overtest")) {
+                mUdeskXmppManager.sendActionMessage(agentJId);
+            } else if (actionText.equals("over")) {
+                InvokeEventContainer.getInstance().event_IsOver.invoke(true);
+                try {
+                    Thread.sleep(2000);
+                    cancleXmpp();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
 
             }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
-            @Override
-            public void onError(Throwable e) {
-
-            }
-
-            @Override
-            public void onNext(Boolean aBoolean) {
-
-            }
-        });
     }
 
-    public Boolean getOverConversation() {
-        return isOverConversation;
+    public void cancleXmpp() {
+        try {
+            Log.i("xxx","UdeskMessageManager cancleXmpp");
+            ensureMessageExecutor();
+            messageExecutor.submit(new Runnable() {
+                @Override
+                public void run() {
+                    if (mUdeskXmppManager != null) {
+                        mUdeskXmppManager.cancel();
+                    }
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
-    public void setOverConversation(Boolean overConversation) {
-        isOverConversation = overConversation;
-    }
 }

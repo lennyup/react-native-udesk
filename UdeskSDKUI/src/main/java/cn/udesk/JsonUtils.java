@@ -1,6 +1,5 @@
 package cn.udesk;
 
-import android.content.Context;
 import android.text.TextUtils;
 
 import org.json.JSONArray;
@@ -9,12 +8,16 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import cn.udesk.config.UdeskBaseInfo;
 import cn.udesk.model.AgentGroupNode;
 import cn.udesk.model.OptionsModel;
 import cn.udesk.model.SDKIMSetting;
+import cn.udesk.model.StructModel;
 import cn.udesk.model.SurveyOptionsModel;
+import cn.udesk.model.TicketReplieMode;
 import udesk.core.model.AgentInfo;
 import udesk.core.model.UDHelperArticleContentItem;
 import udesk.core.model.UDHelperItem;
@@ -92,6 +95,7 @@ public class JsonUtils {
 					}
 					if (agentJson.has("jid")) {
 						agentInfo.setAgentJid(agentJson.getString("jid"));
+						UdeskBaseInfo.sendMsgTo = agentJson.getString("jid");
 					}
 					if (agentJson.has("agent_id")) {
 						agentInfo.setAgent_id(agentJson.getString("agent_id"));
@@ -206,6 +210,8 @@ public class JsonUtils {
 		}
 	}
 
+
+
 	//解析获取配置选项
 
 	public static SDKIMSetting  parserIMSettingJson(String jsonString){
@@ -249,6 +255,15 @@ public class JsonUtils {
 						if (resultJson.has("no_reply_hint")){
 							sdkimSetting.setNo_reply_hint(resultJson.get("no_reply_hint"));
 						}
+						if (resultJson.has("investigation_when_leave")){
+							sdkimSetting.setInvestigation_when_leave(resultJson.get("investigation_when_leave"));
+						}
+						if(resultJson.has("leave_message_type")){
+							sdkimSetting.setLeave_message_type(resultJson.getString("leave_message_type"));
+						}
+						if (resultJson.has("enable_im_survey")){
+							sdkimSetting.setEnable_im_survey(resultJson.get("enable_im_survey"));
+						}
 						if(resultJson.has("robot")){
 							sdkimSetting.setRobot(resultJson.get("robot"));
 						}
@@ -257,10 +272,114 @@ public class JsonUtils {
 			}
 
 
-		} catch (JSONException e) {
+		} catch (Exception e) {
 		}
 
 		return  sdkimSetting;
 	}
+
+	public static StructModel parserStructMsg(String jsonString){
+		StructModel structModel = new StructModel();
+		try {
+			JSONObject rootJson = new JSONObject(jsonString);
+			if (rootJson.has("title")){
+				structModel.setTitle(rootJson.getString("title"));
+			}
+			if (rootJson.has("description")){
+				structModel.setDescription(rootJson.getString("description"));
+			}
+			if (rootJson.has("img_url")){
+				structModel.setImg_url(rootJson.getString("img_url"));
+			}
+
+			if (rootJson.has("buttons")){
+				JSONArray btnArray = rootJson.optJSONArray("buttons");
+				List<StructModel.ButtonsBean> structBtns = new ArrayList<StructModel.ButtonsBean>();
+				if (btnArray != null && btnArray.length() > 0) {
+					for (int i = 0; i < btnArray.length(); i++) {
+						JSONObject data = btnArray.optJSONObject(i);
+						StructModel.ButtonsBean  buttonsBean = new StructModel.ButtonsBean();
+						if (data.has("type")){
+							buttonsBean.setType(data.getString("type"));
+						}
+						if (data.has("text")){
+							buttonsBean.setText(data.getString("text"));
+						}
+						if (data.has("value")){
+							buttonsBean.setValue(data.getString("value"));
+						}
+						structBtns.add(buttonsBean);
+					}
+				}
+				structModel.setButtons(structBtns);
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return  structModel;
+	}
+
+	public  static TicketReplieMode parserTicketReplie(String jsonString){
+		TicketReplieMode replieMode = new TicketReplieMode();
+		try {
+			JSONObject rootJson = new JSONObject(jsonString);
+
+
+			if (rootJson.has("size")){
+				replieMode.setSize(rootJson.getInt("size"));
+			}
+			if (rootJson.has("total")){
+				replieMode.setTotal(rootJson.getInt("total"));
+			}
+			if (rootJson.has("total_pages")){
+				replieMode.setTotal_pages(rootJson.getInt("total_pages"));
+			}
+
+			if (rootJson.has("contents")){
+				JSONArray contentsArray = rootJson.optJSONArray("contents");
+				List<TicketReplieMode.ContentsBean> contents = new ArrayList<TicketReplieMode.ContentsBean >();
+				if (contentsArray != null && contentsArray.length() > 0){
+					for (int i = 0; i < contentsArray.length(); i++) {
+						JSONObject data = contentsArray.optJSONObject(i);
+						TicketReplieMode.ContentsBean  contentsBean = new TicketReplieMode.ContentsBean();
+						if (data.has("reply_id")){
+							contentsBean.setReply_id(data.get("reply_id"));
+						}
+						if (data.has("user_avatar")){
+							contentsBean.setUser_avatar(data.get("user_avatar"));
+						}
+						if (data.has("reply_content")){
+							contentsBean.setReply_content(data.get("reply_content"));
+						}
+						if (data.has("reply_content_type")){
+							contentsBean.setReply_content_type(data.get("reply_content_type"));
+						}
+						if (data.has("reply_type")){
+							contentsBean.setReply_type(data.get("reply_type"));
+						}
+						if (data.has("reply_user")){
+							contentsBean.setReply_user(data.get("reply_user"));
+						}
+						if (data.has("reply_created_at")){
+							contentsBean.setReply_created_at(data.get("reply_created_at"));
+						}
+						if (data.has("reply_updated_at")){
+							contentsBean.setReply_updated_at(data.get("reply_updated_at"));
+						}
+						contents.add(contentsBean);
+					}
+				}
+				replieMode.setContents(contents);
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return  replieMode;
+	}
+
+
 
 }

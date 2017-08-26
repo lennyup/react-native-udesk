@@ -2,13 +2,13 @@ package cn.udesk.messagemanager;
 
 import android.os.Handler;
 import android.text.TextUtils;
+import android.util.Log;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.UUID;
 
-import cn.udesk.UdeskSDKManager;
 import cn.udesk.config.UdeskBaseInfo;
 import udesk.core.UdeskCoreConst;
 import udesk.core.event.InvokeEventContainer;
@@ -85,6 +85,10 @@ public class UdeskXmppManager implements ConnectionListener, PacketListener {
                             "action",
                             "udesk:action",
                             new ActionMsgReceive());
+                    ProviderManager.addExtensionProvider(
+                            "ignored",
+                            "urn:xmpp:ignored",
+                            new IgnoredMsgReceive());
                     xmppConnection.removePacketListener(this);
                     xmppConnection.addPacketListener(this, new OrFilter(msgfilter,
                             presenceFilter, iQFilter));
@@ -149,8 +153,12 @@ public class UdeskXmppManager implements ConnectionListener, PacketListener {
 
     private void sendSelfStatus() {
         try {
+            if (TextUtils.isEmpty(UdeskBaseInfo.sendMsgTo)) {
+                return;
+            }
             Presence statusPacket = new Presence(Presence.Type.available);
             statusPacket.setStatus("online");
+            statusPacket.setTo(UdeskBaseInfo.sendMsgTo);
             if (xmppConnection != null) {
                 xmppConnection.sendPacket(statusPacket);
             }
@@ -166,29 +174,36 @@ public class UdeskXmppManager implements ConnectionListener, PacketListener {
      * @param to
      */
     public void sendComodityMessage(String text, String to) {
-        xmppMsg = new Message(to, Message.Type.chat);
-        text = StringUtils.escapeForXML(text).toString();
-        ProductXmpp product = new ProductXmpp();
-        product.setBody(text);
-        xmppMsg.addExtension(product);
+        if (TextUtils.isEmpty(to)) {
+            return;
+        }
         if (xmppConnection != null) {
             try {
+                xmppMsg = new Message(to, Message.Type.chat);
+                text = StringUtils.escapeForXML(text).toString();
+                ProductXmpp product = new ProductXmpp();
+                product.setBody(text);
+                xmppMsg.addExtension(product);
                 xmppConnection.sendPacket(xmppMsg);
             } catch (Exception e) {
                 e.printStackTrace();
+                reConnected();
             }
         }
     }
 
     public void sendActionMessage(String to) {
-        xmppMsg = new Message(to, Message.Type.chat);
-        xmppMsg.setPacketID(" ");
-        ActionMsgXmpp actionMsgXmpp = new ActionMsgXmpp(ActionMsgXmpp.elementName, ActionMsgXmpp.namespace);
-        actionMsgXmpp.setActionText("overready");
-        actionMsgXmpp.setType("isover");
-        xmppMsg.addExtension(actionMsgXmpp);
+        if (TextUtils.isEmpty(to)) {
+            return;
+        }
         if (xmppConnection != null) {
             try {
+                xmppMsg = new Message(to, Message.Type.chat);
+                xmppMsg.setPacketID(" ");
+                ActionMsgXmpp actionMsgXmpp = new ActionMsgXmpp();
+                actionMsgXmpp.setActionText("overready");
+                actionMsgXmpp.setType("isover");
+                xmppMsg.addExtension(actionMsgXmpp);
                 xmppConnection.sendPacket(xmppMsg);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -198,6 +213,9 @@ public class UdeskXmppManager implements ConnectionListener, PacketListener {
 
     public void sendPreMessage(String type, String text, String to) {
         try {
+            if (TextUtils.isEmpty(to)) {
+                return;
+            }
             if (xmppConnection != null) {
                 xmppMsg = new Message(to, Message.Type.chat);
                 text = StringUtils.escapeForXML(text).toString();
@@ -229,6 +247,9 @@ public class UdeskXmppManager implements ConnectionListener, PacketListener {
      */
     public boolean sendMessage(String type, String text, String msgId, String to, long duration, String im_sub_session_id) {
         try {
+            if (TextUtils.isEmpty(to)) {
+                return false;
+            }
             xmppMsg = new Message(to, Message.Type.chat);
             text = StringUtils.escapeForXML(text).toString();
             xmppMsg.setPacketID(msgId);
@@ -259,6 +280,7 @@ public class UdeskXmppManager implements ConnectionListener, PacketListener {
                 return true;
             } catch (Exception e) {
                 e.printStackTrace();
+                reConnected();
                 return false;
             }
         }
@@ -300,22 +322,24 @@ public class UdeskXmppManager implements ConnectionListener, PacketListener {
             return;
         }
 
-        if (message.getExtension("action", "udesk:action") != null) {
+        if (message.getExtension("action", "udesk:action") != null && message.getExtension("delay", "urn:xmpp:delay") == null) {
             ActionMsgXmpp actionMsgXmpp = message.getExtension("action", "udesk:action");
             if (actionMsgXmpp != null) {
-                InvokeEventContainer.getInstance().event_OnActionMsg.invoke(actionMsgXmpp.getActionText(), message.getFrom());
+                InvokeEventContainer.getInstance().event_OnActionMsg.invoke(actionMsgXmpp.getType(), actionMsgXmpp.getActionText(), message.getFrom());
             }
             return;
         }
+
         sendReceivedMsg(message);
         String id = message.getPacketID();
-        if (id == null || TextUtils.isEmpty(id)) {
+        if (id == null || TextUtils.isEmpty(id.trim())) {
             return;
         }
         if (message.getBody() != null) {
             String type = "";
             String content = "";
             long duration = 0;
+            String send_status = "";
             try {
                 JSONObject json = new JSONObject(message.getBody());
                 if (json.has("type")) {
@@ -331,13 +355,16 @@ public class UdeskXmppManager implements ConnectionListener, PacketListener {
                     }
 
                 }
+                if (json.has("send_status")) {
+                    send_status = json.optString("send_status");
+                }
 
             } catch (JSONException e) {
                 e.printStackTrace();
             }
 
             if (!TextUtils.isEmpty(type) && !TextUtils.isEmpty(content)) {
-                UdeskMessageManager.getInstance().event_OnNewMessage.invoke(message, message.getFrom(), type, id, content, duration);
+                UdeskMessageManager.getInstance().event_OnNewMessage.invoke(message, message.getFrom(), type, id, content, duration, send_status);
             }
         }
     }
@@ -354,8 +381,26 @@ public class UdeskXmppManager implements ConnectionListener, PacketListener {
                 }
             } catch (Exception e) {
                 e.printStackTrace();
+                reConnected();
             }
         }
+    }
+
+    private synchronized void reConnected() {
+        new Thread(new Runnable() {
+
+            @Override
+            public void run() {
+                try {
+                    cancel();
+                    startLoginXmpp();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+
+            }
+        }).start();
     }
 
 
@@ -364,6 +409,7 @@ public class UdeskXmppManager implements ConnectionListener, PacketListener {
      */
     public boolean cancel() {
         try {
+            Log.i("xxx", "cancel xmpp");
             if (xmppConnection != null) {
                 xmppConnection.removePacketListener(UdeskXmppManager.this);
                 xmppConnection.removeConnectionListener(UdeskXmppManager.this);
@@ -396,26 +442,12 @@ public class UdeskXmppManager implements ConnectionListener, PacketListener {
 
     @Override
     public void connectionClosed() {
-
+        reConnected();
     }
 
     @Override
     public void connectionClosedOnError(Exception arg0) {
-        new Thread(new Runnable() {
-
-            @Override
-            public void run() {
-                try {
-                    cancel();
-                    Thread.sleep(1000);
-                    startLoginXmpp();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-
-            }
-        }).start();
+        reConnected();
     }
 
     @Override
@@ -445,11 +477,17 @@ public class UdeskXmppManager implements ConnectionListener, PacketListener {
         }
     }
 
-    public boolean isConnect() {
+    /**
+     * 是否与服务器连接上
+     *
+     * @return
+     */
+    public boolean isConnection() {
         if (xmppConnection != null) {
-            return xmppConnection.isConnected();
+            return (xmppConnection.isConnected() && xmppConnection.isAuthenticated());
         }
         return false;
     }
+
 
 }

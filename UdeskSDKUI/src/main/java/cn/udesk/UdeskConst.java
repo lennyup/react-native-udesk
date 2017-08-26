@@ -62,6 +62,10 @@ public class UdeskConst {
         public static final int TYPE_TEXT = 2;
         public static final int TYPE_REDIRECT = 3;
         public static final int TYPE_RICH = 4;
+        public static final int TYPE_STRUCT = 5;
+        public static final int TYPE_LEAVEMSG = 6;
+        public static final int TYPE_EVENT = 7;
+        public static final int TYPE_VIDEO = 8;
     }
 
     public static int parseTypeForMessage(String type) {
@@ -75,6 +79,14 @@ public class UdeskConst {
             return ChatMsgTypeInt.TYPE_REDIRECT;
         } else if ("rich".equalsIgnoreCase(type)) {
             return ChatMsgTypeInt.TYPE_RICH;
+        }else if("struct".equalsIgnoreCase(type)){
+            return ChatMsgTypeInt.TYPE_STRUCT;
+        }else if ("leavemsg".equalsIgnoreCase(type)){
+            return ChatMsgTypeInt.TYPE_LEAVEMSG;
+        }else if ("udeskevent".equalsIgnoreCase(type)){
+            return ChatMsgTypeInt.TYPE_EVENT;
+        }else if ("video".equalsIgnoreCase(type) || "file".equalsIgnoreCase(type)){
+            return ChatMsgTypeInt.TYPE_VIDEO;
         }
         return ChatMsgTypeInt.TYPE_TEXT;
     }
@@ -85,6 +97,12 @@ public class UdeskConst {
         public static final String TYPE_AUDIO = "audio";
         public static final String TYPE_TEXT = "message";
         public static final String TYPE_REDIRECT = "redirect";
+        public static final String TYPE_STRUCT = "struct";
+        public static final String TYPE_LEAVEMSG = "leavemsg";
+        public static final String TYPE_EVENT = "udeskevent";
+        public static final String TYPE_VIDEO = "video";
+        public static final String TYPE_File = "file";
+
     }
 
     public static class PlayFlag {
@@ -104,8 +122,24 @@ public class UdeskConst {
     public static class SharePreParams {
         public static String RegisterIdName = "registeridname";
         public static String Udesk_Sharepre_Name = "udesk_sdk";
+        public static String Udesk_Domain = "udesk_domain";
+        public static String Udesk_App_Key = "udesk_app_key";
+        public static String Udesk_App_Id = "udesk_app_id";
         public static final String Udesk_SdkToken = "udesk_sdktoken";
         public static final String Udesk_Push_RegisterId = "udesk_push_registerid";
     }
+
+    public static class StructBtnTypeString {
+
+        public static final String link = "link";
+        public static final String phone = "phone";
+        public static final String sdkCallBack = "sdk_callback";
+
+    }
+
+    public static final String FileSize = "fileSize";
+    public static final String FileDownIsSuccess = "filedownissuccess";
+
+
 
 }

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:fresco="http://schemas.android.com/apk/res-auto"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
@@ -14,7 +15,7 @@
         android:layout_marginTop="@dimen/udesk_5"
         android:gravity="center"
         android:textColor="@color/udesk_color_im_time_text1"
-        android:textSize="@dimen/udesk_sp12" />
+        android:textSize="@dimen/udesk_sp14" />
 
 
     <TextView
@@ -29,19 +30,22 @@
         android:textColor="@color/udesk_color_im_tip_text1"
         android:textSize="@dimen/udesk_sp16" />
 
-    <de.hdodenhof.circleimageview.CircleImageView
+    <com.facebook.drawee.view.SimpleDraweeView
         android:id="@+id/udesk_iv_head"
         android:layout_width="@dimen/udesk_chat_head"
         android:layout_height="@dimen/udesk_chat_head"
         android:layout_marginTop="@dimen/udesk_chat_head_margin"
-        android:visibility="gone" />
+        android:visibility="gone"
+        fresco:actualImageScaleType="centerCrop"
+        fresco:roundAsCircle="true"
+        fresco:roundingBorderColor="@color/udesk_color_line2"
+        fresco:roundingBorderWidth="1dp" />
 
     <TextView
         android:id="@+id/udesk_nick_name"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:visibility="gone"
-        />
+        android:visibility="gone" />
 
     <ImageView
         android:id="@+id/udesk_iv_status"

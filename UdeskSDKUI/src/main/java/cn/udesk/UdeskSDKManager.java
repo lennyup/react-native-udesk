@@ -2,13 +2,23 @@ package cn.udesk;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.text.TextUtils;
+import android.widget.Toast;
 
+import com.facebook.cache.disk.DiskCacheConfig;
+import com.facebook.common.internal.Supplier;
+import com.facebook.common.util.ByteConstants;
+import com.facebook.drawee.backends.pipeline.Fresco;
+import com.facebook.imagepipeline.cache.MemoryCacheParams;
+import com.facebook.imagepipeline.core.ImagePipelineConfig;
 import com.tencent.bugly.crashreport.CrashReport;
-
+import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import cn.udesk.activity.UdeskOptionsAgentGroupActivity;
 import cn.udesk.activity.UdeskChatActivity;
@@ -19,10 +29,9 @@ import cn.udesk.config.UdeskBaseInfo;
 import cn.udesk.config.UdeskConfig;
 import cn.udesk.db.UdeskDBManager;
 import cn.udesk.messagemanager.UdeskMessageManager;
+import cn.udesk.model.MsgNotice;
 import cn.udesk.model.SDKIMSetting;
 import cn.udesk.model.UdeskCommodityItem;
-import cn.udesk.widget.UdeskDialog;
-import rx.Subscriber;
 import udesk.core.UdeskCallBack;
 import udesk.core.UdeskCoreConst;
 import udesk.core.UdeskHttpFacade;
@@ -33,13 +42,15 @@ public class UdeskSDKManager {
 
     private static UdeskSDKManager instance = new UdeskSDKManager();
 
-    private UdeskDialog dialog;
+//    private UdeskDialog dialog;
 
     //文本消息中的链接消息的点击事件的拦截回调。 包含表情的不会拦截回调。
     private ITxtMessageWebonCliclk txtMessageClick;
 
     //离线留言表单的回调接口：  如果不用udesk系统提供的留言功能，可以设置该接口  回调使用自己的处理流程
-    private IUdeskFormCallBak formCallBak;
+    private IUdeskFormCallBack formCallBack;
+
+    private IUdeskStructMessageCallBack structMessageCallBack;
 
     //多应用 配置选项mode
     private SDKIMSetting imSetting;
@@ -62,8 +73,19 @@ public class UdeskSDKManager {
     /**
      * 留言界面的回调接口
      */
-    public interface IUdeskFormCallBak {
+    public interface IUdeskFormCallBack {
         void toLuachForm(Context context);
+    }
+
+    /**
+     * 处理结构化消息的 回调性按钮接口
+     */
+    public interface IUdeskStructMessageCallBack {
+        /**
+         * @param context   上下文
+         * @param josnValue 接口配置的字符串
+         */
+        void structMsgCallBack(Context context, String josnValue);
     }
 
     public ITxtMessageWebonCliclk getTxtMessageClick() {
@@ -79,17 +101,44 @@ public class UdeskSDKManager {
         this.txtMessageClick = txtMessageClick;
     }
 
-    public IUdeskFormCallBak getFormCallBak() {
-        return formCallBak;
+    public IUdeskFormCallBack getFormCallBak() {
+        return formCallBack;
     }
 
     /**
      * 设置留言界面的回调接口
      *
-     * @param formCallBak
+     * @param formCallBack
      */
-    public void setFormCallBak(IUdeskFormCallBak formCallBak) {
-        this.formCallBak = formCallBak;
+    public void setFormCallBak(IUdeskFormCallBack formCallBack) {
+        this.formCallBack = formCallBack;
+    }
+
+    public IUdeskStructMessageCallBack getStructMessageCallBack() {
+        return structMessageCallBack;
+    }
+
+    /**
+     * 设置结构化消息的回调接口
+     *
+     * @param structMessageCallBack
+     */
+    public void setStructMessageCallBack(IUdeskStructMessageCallBack structMessageCallBack) {
+        this.structMessageCallBack = structMessageCallBack;
+    }
+
+    private IOnlineMessageCallBack onlineMessage;
+
+    public interface IOnlineMessageCallBack {
+        void onlineMessageReceive(MsgNotice msgNotice);
+    }
+
+    public IOnlineMessageCallBack getOnlineMessage() {
+        return onlineMessage;
+    }
+
+    public void setOnlineMessage(IOnlineMessageCallBack onlineMessage) {
+        this.onlineMessage = onlineMessage;
     }
 
     /**
@@ -104,7 +153,15 @@ public class UdeskSDKManager {
         UdeskBaseInfo.domain = domain;
         UdeskBaseInfo.App_Key = appkey;
         UdeskBaseInfo.App_Id = appid;
-        UdeskUtil.initImageLoaderConfig(context);
+        if (UdeskConfig.isUseShare) {
+            PreferenceHelper.write(context, UdeskConst.SharePreParams.Udesk_Sharepre_Name,
+                    UdeskConst.SharePreParams.Udesk_Domain, domain);
+            PreferenceHelper.write(context, UdeskConst.SharePreParams.Udesk_Sharepre_Name,
+                    UdeskConst.SharePreParams.Udesk_App_Key, appkey);
+            PreferenceHelper.write(context, UdeskConst.SharePreParams.Udesk_Sharepre_Name,
+                    UdeskConst.SharePreParams.Udesk_App_Id, appid);
+        }
+        init(context);
     }
 
     /**
@@ -134,20 +191,23 @@ public class UdeskSDKManager {
      * @param roplist   包含自定义的列表信息
      */
     public void setUserInfo(final Context context, String token, Map<String, String> info, Map<String, String> textField, Map<String, String> roplist) {
-        initCrashReport(context);
+        if (TextUtils.isEmpty(token)) {
+            Toast.makeText(context.getApplicationContext(), context.getString(R.string.udesk_no_sdktoken), Toast.LENGTH_SHORT).show();
+            return;
+        }
         String cacheToken = getSdkToken(context);
         if ((cacheToken == null)) {
             clean(context);
             disConnectXmpp();
         } else if ((cacheToken != null && !cacheToken.equals(token))) {
-            clean(context);
-            disConnectXmpp();
             // 一个应用内切换用户，的关闭上个用户的推送
             if (!TextUtils.isEmpty(UdeskBaseInfo.registerId) && UdeskConfig.isUserSDkPush) {
-                setSdkPushStatus(UdeskBaseInfo.domain, UdeskBaseInfo.App_Key, UdeskBaseInfo.sdkToken, UdeskConfig.UdeskPushFlag.OFF, UdeskBaseInfo.registerId, UdeskBaseInfo.App_Id);
+                setSdkPushStatus(getDomain(context), getAppkey(context), UdeskBaseInfo.sdkToken,
+                        UdeskConfig.UdeskPushFlag.OFF, UdeskBaseInfo.registerId, getAppId(context));
             }
+            disConnectXmpp();
         }
-        UdeskBaseInfo.sdkToken = token;
+        UdeskBaseInfo.sdkToken = stringFilter(token);
         initDB(context, UdeskBaseInfo.sdkToken);
         PreferenceHelper.write(context, UdeskConst.SharePreParams.Udesk_Sharepre_Name,
                 UdeskConst.SharePreParams.Udesk_SdkToken, UdeskBaseInfo.sdkToken);
@@ -160,9 +220,17 @@ public class UdeskSDKManager {
         UdeskBaseInfo.roplist = roplist;
     }
 
+    //过滤掉字符串中的特殊字符
+    private String stringFilter(String str) {
+        String regEx = "[/=]";
+        Pattern p = Pattern.compile(regEx);
+        Matcher m = p.matcher(str);
+        return m.replaceAll("").trim();
+    }
+
     //进入会话入口,支持配置,根据配置进入会话
     public void entryChat(Context context) {
-        if (TextUtils.isEmpty(UdeskBaseInfo.App_Id)) {
+        if (TextUtils.isEmpty(getAppId(context))) {
             showConversationByImGroup(context);
             return;
         }
@@ -233,8 +301,8 @@ public class UdeskSDKManager {
 
     //启动留言界面
     public void goToForm(Context context) {
-        if (formCallBak != null) {
-            formCallBak.toLuachForm(context);
+        if (formCallBack != null) {
+            formCallBack.toLuachForm(context);
             return;
         }
         Intent intent = new Intent(context,
@@ -395,16 +463,17 @@ public class UdeskSDKManager {
         UdeskBaseInfo.updateRoplist = updateRoplist;
     }
 
-   //配置开启留言时的    留言表单的留言提示语
-    public void setLeavingMsg(String leavingMsg){
+    //配置开启留言时的    留言表单的留言提示语
+    public void setLeavingMsg(String leavingMsg) {
         UdeskConfig.UdeskLeavingMsg = leavingMsg;
     }
 
     /**
      * 设置退出排队的模式
+     *
      * @param quitQuenuMode
      */
-    public void setQuitQuenuMode(String quitQuenuMode){
+    public void setQuitQuenuMode(String quitQuenuMode) {
         UdeskConfig.UdeskQuenuMode = quitQuenuMode;
     }
 
@@ -412,22 +481,7 @@ public class UdeskSDKManager {
      * 断开xmpp连接
      */
     public void disConnectXmpp() {
-        UdeskMessageManager.getInstance().cancelXmppConnect().subscribe(new Subscriber<Boolean>() {
-            @Override
-            public void onCompleted() {
-
-            }
-
-            @Override
-            public void onError(Throwable e) {
-
-            }
-
-            @Override
-            public void onNext(Boolean aBoolean) {
-
-            }
-        });
+        UdeskMessageManager.getInstance().cancleXmpp();
     }
 
     /**
@@ -440,11 +494,49 @@ public class UdeskSDKManager {
         UdeskCoreConst.isDebug = isShow;
     }
 
+
     public String getSdkToken(Context context) {
         if (!TextUtils.isEmpty(UdeskBaseInfo.sdkToken)) {
             return UdeskBaseInfo.sdkToken;
         }
-        return PreferenceHelper.readString(context, UdeskConst.SharePreParams.Udesk_Sharepre_Name, UdeskConst.SharePreParams.Udesk_SdkToken);
+        if (UdeskConfig.isUseShare) {
+            return PreferenceHelper.readString(context, UdeskConst.SharePreParams.Udesk_Sharepre_Name, UdeskConst.SharePreParams.Udesk_SdkToken);
+        } else {
+            return "";
+        }
+    }
+
+    public String getDomain(Context context) {
+        if (!TextUtils.isEmpty(UdeskBaseInfo.domain)) {
+            return UdeskBaseInfo.domain;
+        }
+        if (UdeskConfig.isUseShare) {
+            return PreferenceHelper.readString(context, UdeskConst.SharePreParams.Udesk_Sharepre_Name, UdeskConst.SharePreParams.Udesk_Domain);
+        } else {
+            return "";
+        }
+    }
+
+    public String getAppkey(Context context) {
+        if (!TextUtils.isEmpty(UdeskBaseInfo.App_Key)) {
+            return UdeskBaseInfo.App_Key;
+        }
+        if (UdeskConfig.isUseShare) {
+            return PreferenceHelper.readString(context, UdeskConst.SharePreParams.Udesk_Sharepre_Name, UdeskConst.SharePreParams.Udesk_App_Key);
+        } else {
+            return "";
+        }
+    }
+
+    public String getAppId(Context context) {
+        if (!TextUtils.isEmpty(UdeskBaseInfo.App_Id)) {
+            return UdeskBaseInfo.App_Id;
+        }
+        if (UdeskConfig.isUseShare) {
+            return PreferenceHelper.readString(context, UdeskConst.SharePreParams.Udesk_Sharepre_Name, UdeskConst.SharePreParams.Udesk_App_Id);
+        } else {
+            return "";
+        }
     }
 
     public SDKIMSetting getImSetting() {
@@ -459,19 +551,21 @@ public class UdeskSDKManager {
      */
     private void getSDKImSetting(final Context context) {
         try {
-            showLoading(context);
-            UdeskHttpFacade.getInstance().getIMSettings(UdeskBaseInfo.domain, UdeskBaseInfo.App_Key, UdeskBaseInfo.sdkToken, UdeskBaseInfo.App_Id, new UdeskCallBack() {
-                @Override
-                public void onSuccess(String message) {
-                    imSetting = JsonUtils.parserIMSettingJson(message);
-                    switchBySetting(context, imSetting);
-                }
+//            showLoading(context);
+            initCrashReport(context);
+            UdeskHttpFacade.getInstance().getIMSettings(getDomain(context), getAppkey(context), UdeskBaseInfo.sdkToken,
+                    getAppId(context), new UdeskCallBack() {
+                        @Override
+                        public void onSuccess(String message) {
+                            imSetting = JsonUtils.parserIMSettingJson(message);
+                            switchBySetting(context, imSetting);
+                        }
 
-                @Override
-                public void onFail(String message) {
-                    switchBySetting(context, null);
-                }
-            });
+                        @Override
+                        public void onFail(String message) {
+                            switchBySetting(context, null);
+                        }
+                    });
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -487,7 +581,7 @@ public class UdeskSDKManager {
     private void switchBySetting(Context context, SDKIMSetting imSetting) {
         if (imSetting != null) {
             if (imSetting.getIn_session()) {
-                dismiss();
+//                dismiss();
                 toLanuchChatAcitvity(context);
                 return;
             }
@@ -495,12 +589,12 @@ public class UdeskSDKManager {
                 showRobotByConfigSetting(context, imSetting);
                 return;
             }
-            dismiss();
+//            dismiss();
             showConversationByImGroup(context);
             return;
 
         } else {
-            dismiss();
+//            dismiss();
             toLanuchChatAcitvity(context);
         }
 
@@ -514,14 +608,14 @@ public class UdeskSDKManager {
     private void showRobotByConfigSetting(final Context context, final SDKIMSetting imSetting) {
 
         try {
-            UdeskHttpFacade.getInstance().setUserInfo(context, UdeskBaseInfo.domain,
-                    UdeskBaseInfo.App_Key, getSdkToken(context),
+            UdeskHttpFacade.getInstance().setUserInfo(context, getDomain(context),
+                    getAppkey(context), getSdkToken(context),
                     UdeskBaseInfo.userinfo, UdeskBaseInfo.textField,
-                    UdeskBaseInfo.roplist, UdeskBaseInfo.App_Id, new UdeskCallBack() {
+                    UdeskBaseInfo.roplist, getAppId(context), new UdeskCallBack() {
 
                         @Override
                         public void onSuccess(String string) {
-                            dismiss();
+//                            dismiss();
                             if (!TextUtils.isEmpty(imSetting.getRobot())) {
                                 toLanuchRobotAcitivty(context, imSetting.getRobot(), imSetting.getEnable_agent(), imSetting.getEnable_im_group());
                             } else {
@@ -531,7 +625,7 @@ public class UdeskSDKManager {
 
                         @Override
                         public void onFail(String string) {
-                            dismiss();
+//                            dismiss();
                             showConversationByImGroup(context);
                         }
                     });
@@ -550,25 +644,25 @@ public class UdeskSDKManager {
         }
     }
 
-    private void showLoading(Context context) {
-        try {
-            dialog = new UdeskDialog(context, R.style.udesk_dialog);
-            dialog.show();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+//    private void showLoading(Context context) {
+//        try {
+//            dialog = new UdeskDialog(context, R.style.udesk_dialog);
+//            dialog.show();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//
+//    }
 
-    }
-
-    private void dismiss() {
-        try {
-            if (dialog != null) {
-                dialog.dismiss();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+//    private void dismiss() {
+//        try {
+//            if (dialog != null) {
+//                dialog.dismiss();
+//            }
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//    }
 
     private void lanuchChatByConfirmId(Context context, String groupId, String agentId) {
         Intent intent = new Intent(context, UdeskChatActivity.class);
@@ -588,6 +682,81 @@ public class UdeskSDKManager {
         UdeskBaseInfo.updateTextField = null;
         UdeskBaseInfo.roplist = null;
         imSetting = null;
+    }
+
+//    public void showOnlyRobot(final Context context) {
+//
+//        showLoading(context);
+//        UdeskHttpFacade.getInstance().setUserInfo(context, getDomain(context),
+//                getAppkey(context), getSdkToken(context),
+//                UdeskBaseInfo.userinfo, UdeskBaseInfo.textField,
+//                UdeskBaseInfo.roplist, getAppId(context), new UdeskCallBack() {
+//
+//                    @Override
+//                    public void onSuccess(String string) {
+//                        String url = "";
+//                        try {
+//                            JSONObject resultJson = new JSONObject(string);
+//                            if (resultJson.has("robot")) {
+//                                String robotString = resultJson.getString("robot");
+//                                if (!TextUtils.isEmpty(robotString)) {
+//                                    JSONObject robotJson = new JSONObject(robotString);
+//
+//                                    if (robotJson.has("h5_url")) {
+//                                        url = robotJson.getString("h5_url");
+//                                    }
+//                                }
+//                            }
+//                        } catch (JSONException e) {
+//                        }
+//                        if (!TextUtils.isEmpty(url)) {
+//                            toLanuchRobotAcitivty(context, url, "false", false);
+//                        } else {
+//                            UdeskUtils.showToast(context, context.getString(R.string.udesk_has_not_open_robot));
+//                        }
+//                    }
+//
+//                    @Override
+//                    public void onFail(String string) {
+//                        UdeskUtils.showToast(context, string);
+//                    }
+//                });
+//    }
+
+    public void init(final Context context) {
+        final int MAX_HEAP_SIZE = (int) Runtime.getRuntime().maxMemory();
+        final int MAX_DISK_CACHE_SIZE = 300 * ByteConstants.MB;
+        final int MAX_MEMORY_CACHE_SIZE = MAX_HEAP_SIZE / 3;
+        final MemoryCacheParams bitmapCacheParams = new MemoryCacheParams(
+                MAX_MEMORY_CACHE_SIZE,
+                Integer.MAX_VALUE,
+                MAX_MEMORY_CACHE_SIZE,
+                Integer.MAX_VALUE,
+                Integer.MAX_VALUE);
+
+        DiskCacheConfig diskCacheConfig = DiskCacheConfig.newBuilder(context)
+                .setMaxCacheSize(MAX_DISK_CACHE_SIZE)//最大缓存
+                .setBaseDirectoryName("udesk")//子目录
+                .setBaseDirectoryPathSupplier(new Supplier<File>() {
+                    @Override
+                    public File get() {
+                        return UdeskUtil.getExternalCacheDir(context);
+                    }
+                })
+                .build();
+        ImagePipelineConfig config = ImagePipelineConfig.newBuilder(context)
+                .setBitmapMemoryCacheParamsSupplier(
+                        new Supplier<MemoryCacheParams>() {
+                            public MemoryCacheParams get() {
+                                return bitmapCacheParams;
+                            }
+                        })
+                .setMainDiskCacheConfig(diskCacheConfig)
+                .setDownsampleEnabled(true)
+                .setBitmapsConfig(Bitmap.Config.RGB_565)
+                .build();
+
+        Fresco.initialize(context, config);
     }
 
 
