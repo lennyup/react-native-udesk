@@ -145,14 +145,10 @@ class UdeskModule extends ReactContextBaseJavaModule {
     // }
 
     @ReactMethod
-    public void createCommodity (final ReadableMap options, final Callback callback) { // 都是必传的
+    public void createCommodity (final ReadableMap options, final Callback callback) { // 都是必传的（productDetail 可选）
         cleanResponse();
         if (!hasAndNotEmpty(options, "productTitle")) {
             invokeError(callback, "title is empty");
-            return;
-        }
-        if (!hasAndNotEmpty(options, "productDetail")) {
-            invokeError(callback, "description is empty");
             return;
         }
         if (!hasAndNotEmpty(options, "productImageUrl")) {
@@ -165,7 +161,9 @@ class UdeskModule extends ReactContextBaseJavaModule {
         }
         UdeskCommodityItem item = new UdeskCommodityItem();
         item.setTitle(options.getString("productTitle"));// 商品主标题
-        item.setSubTitle(options.getString("productDetail"));//商品副标题
+        if (hasAndNotEmpty(options, "productDetail")) {
+            item.setSubTitle(options.getString("productDetail"));//商品副标题
+        }
         item.setThumbHttpUrl(options.getString("productImageUrl"));// 左侧图片
         item.setCommodityUrl(options.getString("productURL"));// 商品网络链接
         UdeskSDKManager.getInstance().setCommodity(item);
