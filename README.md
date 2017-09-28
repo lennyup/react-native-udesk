@@ -14,8 +14,8 @@ npm install react-native-udesk --save
 ```
 include ':react-native-udesk'
 project(':react-native-udesk').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-udesk/android')
-include ':UdeskSDKUI'
-project(':UdeskSDKUI').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-udesk/UdeskSDKUI')
+include ':udeskSDKUI'
+project(':udeskSDKUI').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-udesk/UdeskSDKUI')
 ```
 在 `app/build.gradle`里添加如下代码：
 ```
